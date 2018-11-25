@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Comic Text Location</title>
+    <style>
+        @font-face {
+            font-family: NaraePro;
+            src: url("font/Core_Narae_Pro.otf") format("opentype");
+        }
+
+        @font-face {
+            font-family: NaraePro;
+            font-weight: bold;
+            src: url("font/Core_Narae_Pro.otf") format("opentype");
+        }
+
+        #canvas {
+            width:2000px;
+            height:2000px;
+        }
+        .rectangle {
+            position: absolute;
+            border: 1px solid #FF0000;
+        }
+
+        #userActions{
+            display: table-cell;
+            height: 150px;
+            width: 200px;
+            vertical-align: middle;
+            text-align: center;
+            color: #37474F;
+            background-color: #FFFFFF;
+            border: solid 2px #333333;
+            border-radius: 10px;
+        }
+        #userActions input{
+            width: 150px;
+            margin: auto;
+        }
+        #imgPrime{ display: none; }
+
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .resizable {
+            background: transparent;
+            width: 100px;
+            height: 100px;
+            position: absolute;
+            top: 100px;
+            left: 100px;
+        }
+
+        .resizable .resizers{
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .resizable .resizers .resizer{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%; /*magic to turn square into circle*/
+            background: transparent;
+            position: absolute;
+        }
+
+        .resizable .resizers .resizer.top-left {
+            left: -5px;
+            top: -5px;
+            cursor: nwse-resize; /*resizer cursor*/
+        }
+        .resizable .resizers .resizer.top-right {
+            right: -5px;
+            top: -5px;
+            cursor: nesw-resize;
+        }
+        .resizable .resizers .resizer.bottom-left {
+            left: -5px;
+            bottom: -5px;
+            cursor: nesw-resize;
+        }
+        .resizable .resizers .resizer.bottom-right {
+            right: -5px;
+            bottom: -5px;
+            cursor: nwse-resize;
+        }
+        .bubbleBox {
+            resize: none;
+            border: none;
+            background: transparent;
+            text-align: center;
+            overflow: hidden;
+            font-family: NaraePro,fantasy;
+        }
+
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+<body>
+<div id="userActions">
+    <p>Drag &amp; Drop Image</p>
+    <input type="file" id="fileUpload" />
+</div>
+<div id="canvas">
+    <img id="imgPrime" src="" alt="uploaded image placeholder" />
+</div>
+<script>
+    var bubbleNum = 1;
+
+    function setCookie(name,value,days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days*24*60*60*1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)===' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+    function eraseCookie(name) {
+        document.cookie = name+'=; Max-Age=-99999999;';
+    }
+
+    initDraw(document.getElementById('canvas'));
+
+    /*Make resizable div by Hung Nguyen*/
+    function makeResizableDiv(bubbleNum, otherElem) {
+        const element = document.getElementById('bubble' + bubbleNum);
+        const resizers = element.getElementsByClassName('resizer');
+        const minimum_size = 20;
+        let original_width = 0;
+        let original_height = 0;
+        let original_x = 0;
+        let original_y = 0;
+        let original_mouse_x = 0;
+        let original_mouse_y = 0;
+        for (let i = 0;i < resizers.length; i++) {
+            const currentResizer = resizers[i];
+            currentResizer.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                original_width = parseFloat(getComputedStyle(element, null).getPropertyValue('width'));
+                original_height = parseFloat(getComputedStyle(element, null).getPropertyValue('height'));
+                original_x = element.getBoundingClientRect().left;
+                original_y = element.getBoundingClientRect().top;
+                original_mouse_x = e.pageX;
+                original_mouse_y = e.pageY;
+                window.addEventListener('mousemove', resize);
+                window.addEventListener('mouseup', stopResize);
+            });
+
+            function resize(e) {
+                if (currentResizer.classList.contains('bottom-right')) {
+                    const width = original_width + (e.pageX - original_mouse_x);
+                    const height = original_height + (e.pageY - original_mouse_y);
+                    if (width > minimum_size) {
+                        element.style.width = width + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.width = (width) + 'px';
+                        }
+                        setCookie("width"+bubbleNum, parseInt(element.style.width, 10));
+                    }
+                    if (height > minimum_size) {
+                        element.style.height = height + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.height = (height) + 'px';
+                        }
+                        setCookie("height"+bubbleNum, parseInt(element.style.height, 10));
+                    }
+                }
+                else if (currentResizer.classList.contains('bottom-left')) {
+                    const height = original_height + (e.pageY - original_mouse_y);
+                    const width = original_width - (e.pageX - original_mouse_x);
+                    if (height > minimum_size) {
+                        element.style.height = height + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.height = (height) + 'px';
+                        }
+                        setCookie("height"+bubbleNum, parseInt(element.style.height, 10));
+                    }
+                    if (width > minimum_size) {
+                        element.style.width = width + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.width = (width) + 'px';
+                        }
+                        element.style.left = original_x + (e.pageX - original_mouse_x) + 'px';
+                        setCookie("width"+bubbleNum, parseInt(element.style.width, 10));
+                        setCookie("left"+bubbleNum, parseInt(element.style.left, 10));
+                    }
+                }
+                else if (currentResizer.classList.contains('top-right')) {
+                    const width = original_width + (e.pageX - original_mouse_x);
+                    const height = original_height - (e.pageY - original_mouse_y);
+                    if (width > minimum_size) {
+                        element.style.width = width + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.width = (width) + 'px';
+                        }
+                        setCookie("width"+bubbleNum, parseInt(element.style.width, 10));
+                    }
+                    if (height > minimum_size) {
+                        element.style.height = height + 'px';
+                        element.style.top = original_y + (e.pageY - original_mouse_y) + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.height = (height) + 'px';
+                        }
+                        setCookie("height"+bubbleNum, parseInt(element.style.height, 10));
+                        setCookie("top"+bubbleNum, parseInt(element.style.top, 10));
+                    }
+                }
+                else {
+                    const width = original_width - (e.pageX - original_mouse_x);
+                    const height = original_height - (e.pageY - original_mouse_y);
+                    if (width > minimum_size) {
+                        element.style.width = width + 'px';
+                        element.style.left = original_x + (e.pageX - original_mouse_x) + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.width = (width) + 'px';
+                        }
+                        setCookie("width"+bubbleNum, parseInt(element.style.width, 10));
+                        setCookie("left"+bubbleNum, parseInt(element.style.left, 10));
+                    }
+                    if (height > minimum_size) {
+                        element.style.height = height + 'px';
+                        element.style.top = original_y + (e.pageY - original_mouse_y) + 'px';
+                        if (otherElem != null) {
+                            otherElem.style.height = (height) + 'px';
+                        }
+                        setCookie("height"+bubbleNum, parseInt(element.style.height, 10));
+                        setCookie("top"+bubbleNum, parseInt(element.style.top, 10));
+                    }
+                }
+            }
+
+            function stopResize() {
+                window.removeEventListener('mousemove', resize)
+            }
+        }
+    }
+
+
+    function initDraw(canvas) {
+        function setMousePosition(e) {
+            var ev = e || window.event; //Moz || IE
+            if (ev.pageX) { //Moz
+                mouse.x = ev.pageX + window.pageXOffset;
+                mouse.y = ev.pageY + window.pageYOffset;
+            } else if (ev.clientX) { //IE
+                mouse.x = ev.clientX + document.body.scrollLeft;
+                mouse.y = ev.clientY + document.body.scrollTop;
+            }
+        }
+
+        var mouse = {
+            x: 0,
+            y: 0,
+            startX: 0,
+            startY: 0
+        };
+        var element = null;
+
+        canvas.onmousemove = function (e) {
+            setMousePosition(e);
+            if (element !== null) {
+                element.style.width = Math.abs(mouse.x - mouse.startX) + 'px';
+                element.style.height = Math.abs(mouse.y - mouse.startY) + 'px';
+                element.style.left = (mouse.x - mouse.startX < 0) ? mouse.x + 'px' : mouse.startX + 'px';
+                element.style.top = (mouse.y - mouse.startY < 0) ? mouse.y + 'px' : mouse.startY + 'px';
+            }
+        };
+
+        canvas.onclick = function (e) {
+            if (element !== null) {
+                element.id = "bubble" + bubbleNum;
+                var x = document.createElement("textarea");
+                x.style.width = element.style.width;
+                x.style.height = element.style.height;
+                x.setAttribute("placeholder", "Bubble "+bubbleNum);
+                x.id = bubbleNum;
+                x.className = 'bubbleBox';
+                (function($) {
+                    $(x).on('change keyup paste', function() {
+                        setCookie("bubble"+parseInt(this.id, 10), this.value.replace("\n", "-#"));
+                    });
+                })(jQuery);
+
+                setCookie("bubble"+bubbleNum, "");
+
+                element.innerHTML += "<div class='resizers'>\n" +
+                    "    <div class='resizer top-left'></div>\n" +
+                    "    <div class='resizer top-right'></div>\n" +
+                    "    <div class='resizer bottom-left'></div>\n" +
+                    "    <div class='resizer bottom-right'></div>\n" +
+                    "  </div>";
+
+                element.getElementsByClassName("resizers")[0].appendChild(x);
+                console.log("width: ", element.style.width, " height: ", element.style.height, " left: ", element.style.left, " top: ", element.style.top);
+
+                makeResizableDiv(bubbleNum, x);
+
+                setCookie("width"+bubbleNum, parseInt(element.style.width, 10));
+                setCookie("height"+bubbleNum, parseInt(element.style.height, 10));
+                setCookie("left"+bubbleNum, parseInt(element.style.left, 10));
+                setCookie("top"+bubbleNum, parseInt(element.style.top, 10));
+
+
+                element = null;
+                bubbleNum++;
+                canvas.style.cursor = "default";
+                console.log("finsihed.");
+            } else {
+                if (document.elementFromPoint(mouse.x, mouse.y).tagName !== "IMG") {
+                    return
+                }
+                console.log("begun.");
+                mouse.startX = mouse.x;
+                mouse.startY = mouse.y;
+                element = document.createElement('div');
+                element.className = 'rectangle resizable';
+                element.style.left = mouse.x + 'px';
+                element.style.top = mouse.y + 'px';
+                canvas.appendChild(element);
+                canvas.style.cursor = "crosshair";
+            }
+        }
+    }
+</script>
+<script>
+    'use strict';
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Global Object $: Generic controls
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    (function(){
+        // http://stackoverflow.com/questions/4083351/what-does-jquery-fn-mean
+        var $ = function( elem ){
+            if (!(this instanceof $)){
+                return new $(elem);
+            }
+            this.el = document.getElementById( elem );
+        };
+        window.$ = $;
+        $.prototype = {
+            onChange : function( callback ){
+                this.el.addEventListener('change', callback );
+                return this;
+            }
+        };
+    })();
+
+    /**
+     * Fire an event handler to the specified node. Event handlers can detect that the event was fired programatically
+     * by testing for a 'synthetic=true' property on the event object
+     * @param {HTMLNode} node The node to fire the event handler on.
+     * @param {String} eventName The name of the event without the "on" (e.g., "focus")
+     */
+    function fireEvent(node, eventName) {
+        // Make sure we use the ownerDocument from the provided node to avoid cross-window problems
+        var doc;
+        if (node.ownerDocument) {
+            doc = node.ownerDocument;
+        } else if (node.nodeType == 9){
+            // the node may be the document itself, nodeType 9 = DOCUMENT_NODE
+            doc = node;
+        } else {
+            throw new Error("Invalid node passed to fireEvent: " + node.id);
+        }
+
+        if (node.dispatchEvent) {
+            // Gecko-style approach (now the standard) takes more work
+            var eventClass = "";
+
+            // Different events have different event classes.
+            // If this switch statement can't map an eventName to an eventClass,
+            // the event firing is going to fail.
+            switch (eventName) {
+                case "click": // Dispatching of 'click' appears to not work correctly in Safari. Use 'mousedown' or 'mouseup' instead.
+                case "mousedown":
+                case "mouseup":
+                    eventClass = "MouseEvents";
+                    break;
+
+                case "focus":
+                case "change":
+                case "blur":
+                case "select":
+                    eventClass = "HTMLEvents";
+                    break;
+
+                default:
+                    throw "fireEvent: Couldn't find an event class for event '" + eventName + "'.";
+                    break;
+            }
+            var event = doc.createEvent(eventClass);
+            event.initEvent(eventName, true, true); // All events created as bubbling and cancelable.
+
+            event.synthetic = true; // allow detection of synthetic events
+            // The second parameter says go ahead with the default action
+            node.dispatchEvent(event, true);
+        } else  if (node.fireEvent) {
+            // IE-old school style, you can drop this if you don't need to support IE8 and lower
+            var event = doc.createEventObject();
+            event.synthetic = true; // allow detection of synthetic events
+            node.fireEvent("on" + eventName, event);
+        }
+    }
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Drag and Drop code for Upload
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    var dragdrop = {
+        init : function( elem ){
+            elem.setAttribute('ondrop', 'dragdrop.drop(event)');
+            elem.setAttribute('ondragover', 'dragdrop.drag(event)' );
+            elem.setAttribute('onclick', 'dragdrop.click(event)')
+        },
+        drop : function(e){
+            e.preventDefault();
+            var file = e.dataTransfer.files[0];
+            runUpload( file );
+        },
+        drag : function(e){
+            e.preventDefault();
+        },
+        click : function (e) {
+            e.preventDefault();
+            var up = document.getElementById("fileUpload");
+            fireEvent(up, "click");
+            //fireEvent(up, "mouseup");
+
+            console.log("AAHH");
+        }
+    };
+
+
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Code to capture a file (image)
+     //  and upload it to the browser
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    function runUpload( file ) {
+        // http://stackoverflow.com/questions/12570834/how-to-preview-image-get-file-size-image-height-and-width-before-upload
+        if( file.type === 'image/png'  ||
+            file.type === 'image/jpg'  ||
+            file.type === 'image/jpeg' ||
+            file.type === 'image/gif'  ||
+            file.type === 'image/bmp'  ){
+            var reader = new FileReader();
+            reader.readAsDataURL( file );
+            reader.onload = function( _file ){
+                var imgPrime = document.getElementById("imgPrime");
+                imgPrime.src = _file.target.result;
+                imgPrime.style.display = 'inline';
+                document.getElementById("userActions").style.display = 'none';
+
+                imgPrime.onload = function () {
+                    var element = null;
+                    while (getCookie("left"+bubbleNum) != null) {
+                        element = document.createElement('div');
+                        element.className = 'rectangle resizable';
+                        document.getElementById('canvas').appendChild(element);
+                        localStorage.setItem("img", imgPrime.src.toString());
+
+                        var imgPosit = imgPrime.getBoundingClientRect();
+
+
+                        var offsetLeft = imgPosit.left + parseInt(getCookie("left"+bubbleNum), 10);
+                        var offsetTop = imgPosit.top + parseInt(getCookie("top"+bubbleNum), 10);
+                        element.style.width = getCookie("width"+bubbleNum) + 'px';
+                        element.style.height = getCookie("height"+bubbleNum) + 'px';
+                        element.style.top = offsetTop + 'px';
+                        element.style.left = offsetLeft + 'px';
+
+                        element.id = "bubble" + bubbleNum;
+                        var x = document.createElement("textarea");
+                        x.style.width = element.style.width;
+                        x.style.height = element.style.height;
+                        x.setAttribute("placeholder", "Bubble "+bubbleNum);
+                        x.id = bubbleNum;
+                        x.className = 'bubbleBox';
+                        x.value = getCookie("bubble"+bubbleNum).replace("-#", "\n");
+                        (function($) {
+                            $(x).on('change keyup paste', function() {
+                                setCookie("bubble"+parseInt(this.id, 10), this.value.replace("\n", "-#"));
+                            });
+                        })(jQuery);
+
+                        element.innerHTML += "<div class='resizers'>\n" +
+                            "    <div class='resizer top-left'></div>\n" +
+                            "    <div class='resizer top-right'></div>\n" +
+                            "    <div class='resizer bottom-left'></div>\n" +
+                            "    <div class='resizer bottom-right'></div>\n" +
+                            "  </div>";
+
+                        element.getElementsByClassName("resizers")[0].appendChild(x);
+                        console.log("width: ", element.style.width, " height: ", element.style.height, " left: ", element.style.left, " top: ", element.style.top);
+
+                        makeResizableDiv(bubbleNum, x);
+
+                        element = null;
+                        bubbleNum++;
+                    }
+                };
+            } // END reader.onload()
+        } // END test if file.type === image
+    }
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	window.onload fun
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    window.onload = function(){
+        if( window.FileReader ){
+            // Connect the DIV surrounding the file upload to HTML5 drag and drop calls
+            dragdrop.init( $('userActions').el );
+            //	Bind the input[type="file"] to the function runUpload()
+            $('fileUpload').onChange(function(){ runUpload( this.files[0] ); });
+        }else{
+            // Report error message if FileReader is unavilable
+            var p   = document.createElement( 'p' ),
+                msg = document.createTextNode( 'Sorry, your browser does not support FileReader.' );
+            p.className = 'error';
+            p.appendChild( msg );
+            $('userActions').el.innerHTML = '';
+            $('userActions').el.appendChild( p );
+        }
+    };
+</script>
+</body>
+</html>

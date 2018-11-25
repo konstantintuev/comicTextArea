@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Comic Text Location</title>
+    <style>
+        @font-face {
+            font-family: NaraePro;
+            src: url("font/Core_Narae_Pro.otf") format("opentype");
+        }
+
+        @font-face {
+            font-family: NaraePro;
+            font-weight: bold;
+            src: url("font/Core_Narae_Pro.otf") format("opentype");
+        }
+        #canvas {
+            width:2000px;
+            height:2000px;
+            margin: 5em;
+            padding: 6px;
+        }
+        .rectangle {
+            position: absolute;
+            text-align: center;
+            white-space:nowrap;
+        }
+
+        .rectangle > * {white-space:normal;}
+
+        .rectangle:before,
+        .rectangle >* {display:inline-block; vertical-align:middle;}
+
+        .rectangle:before {content:"";  height:100%;}
+
+        #userActions{
+            display: table-cell;
+            height: 150px;
+            width: 200px;
+            vertical-align: middle;
+            text-align: center;
+            color: #37474F;
+            background-color: #FFFFFF;
+            border: solid 2px #333333;
+            border-radius: 10px;
+        }
+        #userActions input{
+            width: 150px;
+            margin: auto;
+        }
+        #imgPrime{ display: none; }
+
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/3/jquery.textfill.js"></script>
+
+</head>
+<body>
+<div id="userActions">
+    <p>Drag &amp; Drop Image</p>
+    <input type="file" id="fileUpload" />
+</div>
+<div id="canvas">
+    <img id="imgPrime" src="" alt="uploaded image placeholder" />
+</div>
+<script>
+    /**
+     * Fire an event handler to the specified node. Event handlers can detect that the event was fired programatically
+     * by testing for a 'synthetic=true' property on the event object
+     * @param {HTMLNode} node The node to fire the event handler on.
+     * @param {String} eventName The name of the event without the "on" (e.g., "focus")
+     */
+    function fireEvent(node, eventName) {
+        // Make sure we use the ownerDocument from the provided node to avoid cross-window problems
+        var doc;
+        if (node.ownerDocument) {
+            doc = node.ownerDocument;
+        } else if (node.nodeType == 9){
+            // the node may be the document itself, nodeType 9 = DOCUMENT_NODE
+            doc = node;
+        } else {
+            throw new Error("Invalid node passed to fireEvent: " + node.id);
+        }
+
+        if (node.dispatchEvent) {
+            // Gecko-style approach (now the standard) takes more work
+            var eventClass = "";
+
+            // Different events have different event classes.
+            // If this switch statement can't map an eventName to an eventClass,
+            // the event firing is going to fail.
+            switch (eventName) {
+                case "click": // Dispatching of 'click' appears to not work correctly in Safari. Use 'mousedown' or 'mouseup' instead.
+                case "mousedown":
+                case "mouseup":
+                    eventClass = "MouseEvents";
+                    break;
+
+                case "focus":
+                case "change":
+                case "blur":
+                case "select":
+                    eventClass = "HTMLEvents";
+                    break;
+
+                default:
+                    throw "fireEvent: Couldn't find an event class for event '" + eventName + "'.";
+                    break;
+            }
+            var event = doc.createEvent(eventClass);
+            event.initEvent(eventName, true, true); // All events created as bubbling and cancelable.
+
+            event.synthetic = true; // allow detection of synthetic events
+            // The second parameter says go ahead with the default action
+            node.dispatchEvent(event, true);
+        } else  if (node.fireEvent) {
+            // IE-old school style, you can drop this if you don't need to support IE8 and lower
+            var event = doc.createEventObject();
+            event.synthetic = true; // allow detection of synthetic events
+            node.fireEvent("on" + eventName, event);
+        }
+    }
+
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)===' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+    function eraseCookie(name) {
+        document.cookie = name+'=; Max-Age=-99999999;';
+    }
+</script>
+<script>
+    var bubbleNum = 1;
+
+    'use strict';
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Global Object $: Generic controls
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    (function(){
+        // http://stackoverflow.com/questions/4083351/what-does-jquery-fn-mean
+        var $ = function( elem ){
+            if (!(this instanceof $)){
+                return new $(elem);
+            }
+            this.el = document.getElementById( elem );
+        };
+        window.$ = $;
+        $.prototype = {
+            onChange : function( callback ){
+                this.el.addEventListener('change', callback );
+                return this;
+            }
+        };
+    })();
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Drag and Drop code for Upload
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    var dragdrop = {
+        init : function( elem ){
+            elem.setAttribute('ondrop', 'dragdrop.drop(event)');
+            elem.setAttribute('ondragover', 'dragdrop.drag(event)' );
+            elem.setAttribute('onclick', 'dragdrop.click(event)')
+        },
+        drop : function(e){
+            e.preventDefault();
+            var file = e.dataTransfer.files[0];
+            runUpload( file );
+        },
+        drag : function(e){
+            e.preventDefault();
+        },
+        click : function (e) {
+            e.preventDefault();
+            var up = document.getElementById("fileUpload");
+            fireEvent(up, "click");
+            //fireEvent(up, "mouseup");
+
+            console.log("AAHH");
+        }
+    };
+
+
+
+    function setImage(base64) {
+        var imgPrime = document.getElementById("imgPrime");
+        imgPrime.src = base64;
+        imgPrime.style.display = 'inline';
+        document.getElementById("userActions").style.display = 'none';
+
+        imgPrime.onload = function () {
+            var element = null;
+            while (getCookie("left"+bubbleNum) != null) {
+                element = document.createElement('div');
+                element.id = "bubble"+bubbleNum;
+                element.style.fontFamily = "NaraePro,fantasy";
+                //element.style.overflow = "hidden";
+                element.innerHTML = "<span>" + getCookie("bubble"+bubbleNum).replace("-#", "\n") + "</span>";
+                element.className = 'rectangle';
+                document.getElementById('canvas').appendChild(element);
+
+                var imgPosit = imgPrime.getBoundingClientRect();
+
+
+                var offsetLeft = imgPosit.left + parseInt(getCookie("left"+bubbleNum), 10) + window.pageXOffset;
+                var offsetTop = imgPosit.top + parseInt(getCookie("top"+bubbleNum), 10) + window.pageYOffset;
+                element.style.width = getCookie("width"+bubbleNum) + 'px';
+                element.style.height = getCookie("height"+bubbleNum) + 'px';
+                element.style.top = offsetTop + 'px';
+                element.style.left = offsetLeft + 'px';
+
+                (function($) {
+                    $("#bubble"+bubbleNum).textfill({
+                        maxFontPixels: 40,
+                        minFontPixels: 12
+                    });
+                })(jQuery);
+
+
+                element = null;
+
+                bubbleNum++;
+            }
+        };
+    }
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	Code to capture a file (image)
+     //  and upload it to the browser
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    function runUpload( file ) {
+        // http://stackoverflow.com/questions/12570834/how-to-preview-image-get-file-size-image-height-and-width-before-upload
+        if( file.type === 'image/png'  ||
+            file.type === 'image/jpg'  ||
+            file.type === 'image/jpeg' ||
+            file.type === 'image/gif'  ||
+            file.type === 'image/bmp'  ){
+            var reader = new FileReader();
+            reader.readAsDataURL( file );
+            reader.onload = function( _file ){
+                setImage(_file.target.result);
+            } // END reader.onload()
+        } // END test if file.type === image
+    }
+
+    /**
+     // ||||||||||||||||||||||||||||||| \\
+     //	window.onload fun
+     // ||||||||||||||||||||||||||||||| \\
+     **/
+    window.onload = function(){
+        if( window.FileReader ){
+            // Connect the DIV surrounding the file upload to HTML5 drag and drop calls
+            dragdrop.init( $('userActions').el );
+            //	Bind the input[type="file"] to the function runUpload()
+            $('fileUpload').onChange(function(){ runUpload( this.files[0] ); });
+        }else{
+            // Report error message if FileReader is unavilable
+            var p   = document.createElement( 'p' ),
+                msg = document.createTextNode( 'Sorry, your browser does not support FileReader.' );
+            p.className = 'error';
+            p.appendChild( msg );
+            $('userActions').el.innerHTML = '';
+            $('userActions').el.appendChild( p );
+        }
+        var obj = localStorage.getItem("img");
+        if (obj != null) {
+            setImage(obj);
+        }
+    };
+</script>
+</body>
+</html>
