@@ -12,7 +12,7 @@ It's still a javascript only editor and preview. The editor is not very well opt
 
 ## Demo ##
 
-![Demo](demo/demo_comic_internationalize.gif)
+![Demo](https://i.imgur.com/NzMPOCF.gif)
 
 ## License ##
 
