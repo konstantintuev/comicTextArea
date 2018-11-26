@@ -6,9 +6,13 @@ My project tries to solve a problem with many web comics - there needs to be sep
 
 This makes it hard for many translations to be available, wastes time for the creators and makes community sourced translations a lot harder.
 
-## Who is this project going? ##
+## How is this project going? ##
 
 It's still a javascript only editor and preview. The editor is not very well optimized for mobile.
+
+## Demo ##
+
+![Demo](demo/demo_comic_internationalize.gif)
 
 ## License ##
 

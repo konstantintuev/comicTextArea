@@ -205,7 +205,7 @@
                 element.id = "bubble"+bubbleNum;
                 element.style.fontFamily = "NaraePro,fantasy";
                 //element.style.overflow = "hidden";
-                element.innerHTML = "<span>" + getCookie("bubble"+bubbleNum).replace("-#", "\n") + "</span>";
+                element.innerHTML = "<span>" + getCookie("bubble"+bubbleNum).replace("-#", "<br>") + "</span>";
                 element.className = 'rectangle';
                 document.getElementById('canvas').appendChild(element);
 
@@ -222,7 +222,7 @@
                 (function($) {
                     $("#bubble"+bubbleNum).textfill({
                         maxFontPixels: 40,
-                        minFontPixels: 12
+                        minFontPixels: 4
                     });
                 })(jQuery);
 
